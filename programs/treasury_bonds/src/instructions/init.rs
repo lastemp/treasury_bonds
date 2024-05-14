@@ -25,8 +25,6 @@ pub struct Init<'info> {
 }
 
 pub fn init(ctx: Context<Init>) -> Result<()> {
-    msg!("Validate inputs");
-
     let treasury_bonds_configs = &mut ctx.accounts.treasury_bonds_configs;
 
     // treasury bonds

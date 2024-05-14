@@ -47,12 +47,13 @@ pub struct RegisterTreasuryBonds<'info> {
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct RegisterTreasuryBondsParams {
     issuer: BondIssuer,               // bond issuer details
-    country: String,                  // home country where trust scheme is implemented
+    country: String,                  // home country where treasury bonds is issued
     issue_no: String,                 // issue no of bond
     type_of_bond: u8, // type of bond i.e Fixed coupon Treasury bonds, Infrastructure bonds
     tenor: u8,        // maturity period i.e between 2-30 years
     coupon_rate: u8,  // coupon rate (%)
     total_amounts_offered: u32, // total amounts offered for the given bond
+    minimum_bid_amount: u32, // minimum bid amount
     unit_cost_of_treasury_bonds: u32, // unit cost of treasury bonds
     decimals: u8,     // decimals for the token mint
     value_date: String, // value date of bond
@@ -66,8 +67,8 @@ const ISSUER_NO_LENGTH: usize = 20;
 // tenor length
 const TENOR_LENGTH: u8 = 2;
 const TENOR_LENGTH_2: u8 = 30;
-// listing date length
-const LISTING_DATE_LENGTH: usize = 20;
+// date length
+const DATE_LENGTH: usize = 20;
 // country length
 const COUNTRY_LENGTH: usize = 3;
 const COUNTRY_LENGTH_2: usize = 2;
@@ -127,20 +128,23 @@ pub fn register_treasury_bonds(
         return Err(TreasuryBondsError::InvalidAmount.into());
     }
 
+    if params.minimum_bid_amount > 0 {
+    } else {
+        return Err(TreasuryBondsError::InvalidAmount.into());
+    }
+
     if params.unit_cost_of_treasury_bonds > 0 {
     } else {
         return Err(TreasuryBondsError::InvalidAmount.into());
     }
 
-    if params.value_date.as_bytes().len() > 0
-        && params.value_date.as_bytes().len() <= LISTING_DATE_LENGTH
-    {
+    if params.value_date.as_bytes().len() > 0 && params.value_date.as_bytes().len() <= DATE_LENGTH {
     } else {
         return Err(TreasuryBondsError::InvalidValueDateLength.into());
     }
 
     if params.redemption_date.as_bytes().len() > 0
-        && params.redemption_date.as_bytes().len() <= LISTING_DATE_LENGTH
+        && params.redemption_date.as_bytes().len() <= DATE_LENGTH
     {
     } else {
         return Err(TreasuryBondsError::InvalidValueRedemptionLength.into());
@@ -170,6 +174,7 @@ pub fn register_treasury_bonds(
     treasury_bonds.tenor = params.tenor;
     treasury_bonds.coupon_rate = params.coupon_rate;
     treasury_bonds.total_amounts_offered = params.total_amounts_offered;
+    treasury_bonds.minimum_bid_amount = params.minimum_bid_amount;
     treasury_bonds.is_initialized = true;
     treasury_bonds.unit_cost_of_treasury_bonds = params.unit_cost_of_treasury_bonds;
     treasury_bonds.decimals = params.decimals;

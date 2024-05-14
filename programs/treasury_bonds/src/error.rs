@@ -21,6 +21,8 @@ pub enum TreasuryBondsError {
     InvalidAmount,
     #[msg("Invalid numeric value.")]
     InvalidNumeric,
+    #[msg("Invalid minimum bid amount.")]
+    InvalidMinimumBidAmount,
 
     //
     #[msg("Invalid country length")]

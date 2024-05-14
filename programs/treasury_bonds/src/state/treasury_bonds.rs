@@ -15,6 +15,7 @@ pub struct TreasuryBonds {
     pub coupon_rate: u8,  // coupon rate (%)
     pub total_amounts_offered: u32, // total amounts offered for the given bond
     pub total_amounts_accepted: u32, // total amounts accepted from bondholders (investors)
+    pub minimum_bid_amount: u32, // minimum bid amount
     pub is_initialized: bool, // is treasury bonds initiated
     #[max_len(10)]
     pub investors: Vec<Pubkey>, // list of the investors

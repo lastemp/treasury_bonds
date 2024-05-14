@@ -17,7 +17,6 @@ pub mod treasury_bonds {
         instructions::init(ctx)
     }
 
-    // public instructions
     pub fn register_treasury_bonds(
         ctx: Context<RegisterTreasuryBonds>,
         params: RegisterTreasuryBondsParams,
@@ -25,10 +24,33 @@ pub mod treasury_bonds {
         instructions::register_treasury_bonds(ctx, &params)
     }
 
+    // public instructions
     pub fn register_investor(
         ctx: Context<RegisterInvestor>,
         params: RegisterInvestorParams,
     ) -> Result<()> {
         instructions::register_investor(ctx, &params)
+    }
+
+    pub fn buy_treasury_bonds(
+        ctx: Context<BuyTreasuryBonds>,
+        params: BuyTreasuryBondsParams,
+    ) -> Result<()> {
+        instructions::buy_treasury_bonds(ctx, &params)
+    }
+
+    pub fn sell_treasury_bonds(
+        ctx: Context<SellTreasuryBonds>,
+        params: SellTreasuryBondsParams,
+    ) -> Result<()> {
+        instructions::sell_treasury_bonds(ctx, &params)
+    }
+
+    pub fn create_token(ctx: Context<CreateToken>, params: CreateTokenParams) -> Result<()> {
+        instructions::create_token(ctx, &params)
+    }
+
+    pub fn transfer_token(ctx: Context<TransferToken>, params: TransferTokenParams) -> Result<()> {
+        instructions::transfer_token(ctx, &params)
     }
 }
