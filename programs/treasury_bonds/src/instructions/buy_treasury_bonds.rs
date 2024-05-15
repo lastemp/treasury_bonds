@@ -99,6 +99,8 @@ pub fn buy_treasury_bonds(
         .checked_mul(result as u64)
         .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
 
+    treasury_bonds.investors.push(*sender.key);
+
     transfer(
         CpiContext::new(
             token_program.to_account_info(),
