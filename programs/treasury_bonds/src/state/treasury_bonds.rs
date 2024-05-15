@@ -15,14 +15,16 @@ pub struct TreasuryBonds {
     pub coupon_rate: u8,  // coupon rate (%)
     pub total_amounts_offered: u32, // total amounts offered for the given bond
     pub total_amounts_accepted: u32, // total amounts accepted from bondholders (investors)
-    pub minimum_bid_amount: u32, // minimum bid amount
-    pub is_initialized: bool, // is treasury bonds initiated
+    pub total_available_funds: u32, // total available funds equal to the treasury bonds owned by investors
+    pub minimum_bid_amount: u32,    // minimum bid amount
+    pub is_initialized: bool,       // is treasury bonds initiated
     #[max_len(10)]
     pub investors: Vec<Pubkey>, // list of the investors
     pub unit_cost_of_treasury_bonds: u32, // unit cost of treasury bonds
-    pub decimals: u8,     // decimals for the token mint
+    pub decimals: u8,               // decimals for the token mint
     #[max_len(20)]
     pub value_date: String, // value date of bond
     #[max_len(20)]
     pub redemption_date: String, // redemption date of bond
+    pub is_matured: bool,           // is treasury bonds matured
 }

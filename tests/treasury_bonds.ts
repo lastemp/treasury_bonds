@@ -32,8 +32,11 @@ describe("treasury_bonds", () => {
     owner: payer.publicKey,
   });
 
-  let investorOwner = anchor.web3.Keypair.generate();
-  let investorOwnerATA = anchor.web3.Keypair.generate();
+  let firstInvestorOwner = anchor.web3.Keypair.generate();
+  let firstInvestorOwnerATA = anchor.web3.Keypair.generate();
+
+  let secondInvestorOwner = anchor.web3.Keypair.generate();
+  let secondInvestorOwnerATA = anchor.web3.Keypair.generate();
 
   let treasuryVaultATA: Account;
 
@@ -64,10 +67,18 @@ describe("treasury_bonds", () => {
     program.programId
   );
 
-  let [investor] = anchor.web3.PublicKey.findProgramAddressSync(
+  let [firstInvestor] = anchor.web3.PublicKey.findProgramAddressSync(
     [
       anchor.utils.bytes.utf8.encode("investor"),
-      investorOwner.publicKey.toBuffer(),
+      firstInvestorOwner.publicKey.toBuffer(),
+    ],
+    program.programId
+  );
+
+  let [secondInvestor] = anchor.web3.PublicKey.findProgramAddressSync(
+    [
+      anchor.utils.bytes.utf8.encode("investor"),
+      secondInvestorOwner.publicKey.toBuffer(),
     ],
     program.programId
   );
@@ -88,10 +99,26 @@ describe("treasury_bonds", () => {
     });
   });
 
-  // investor owner
+  // first investor owner
   before(async () => {
     let res = await provider.connection.requestAirdrop(
-      investorOwner.publicKey,
+      firstInvestorOwner.publicKey,
+      10 * anchor.web3.LAMPORTS_PER_SOL
+    );
+
+    let latestBlockHash = await provider.connection.getLatestBlockhash();
+
+    await provider.connection.confirmTransaction({
+      blockhash: latestBlockHash.blockhash,
+      lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
+      signature: res,
+    });
+  });
+
+  // second investor owner
+  before(async () => {
+    let res = await provider.connection.requestAirdrop(
+      secondInvestorOwner.publicKey,
       10 * anchor.web3.LAMPORTS_PER_SOL
     );
 
@@ -211,7 +238,7 @@ describe("treasury_bonds", () => {
 
     try {
       let initParams = {
-        amount: new anchor.BN(100),
+        amount: new anchor.BN(200),
       };
 
       const tx = await program.methods
@@ -233,19 +260,19 @@ describe("treasury_bonds", () => {
     }
   });
 
-  it("Is token transfer", async () => {
+  it("Is token transfer - first investor", async () => {
     console.log(
       "investor owner token account: ",
-      investorOwnerATA.publicKey.toBase58()
+      firstInvestorOwnerATA.publicKey.toBase58()
     );
 
     try {
       await createAccount(
         provider.connection,
-        investorOwner,
+        firstInvestorOwner,
         mintToken.publicKey,
-        investorOwner.publicKey,
-        investorOwnerATA
+        firstInvestorOwner.publicKey,
+        firstInvestorOwnerATA
       );
     } catch (error) {
       console.log(error);
@@ -262,7 +289,50 @@ describe("treasury_bonds", () => {
           treasuryBonds: treasuryBonds,
           mintToken: mintToken.publicKey,
           fromAccount: tokenAccount,
-          toAccount: investorOwnerATA.publicKey,
+          toAccount: firstInvestorOwnerATA.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associateTokenProgram: associateTokenProgram,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([mintToken])
+        .rpc();
+
+      console.log("Your transaction signature", tx);
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  it("Is token transfer - second investor", async () => {
+    console.log(
+      "investor owner token account: ",
+      secondInvestorOwnerATA.publicKey.toBase58()
+    );
+
+    try {
+      await createAccount(
+        provider.connection,
+        secondInvestorOwner,
+        mintToken.publicKey,
+        secondInvestorOwner.publicKey,
+        secondInvestorOwnerATA
+      );
+    } catch (error) {
+      console.log(error);
+    }
+
+    try {
+      let initParams = {
+        amount: new anchor.BN(100),
+      };
+      const tx = await program.methods
+        .transferToken(initParams)
+        .accounts({
+          owner: payer.publicKey,
+          treasuryBonds: treasuryBonds,
+          mintToken: mintToken.publicKey,
+          fromAccount: tokenAccount,
+          toAccount: secondInvestorOwnerATA.publicKey,
           tokenProgram: TOKEN_PROGRAM_ID,
           associateTokenProgram: associateTokenProgram,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -286,11 +356,11 @@ describe("treasury_bonds", () => {
       const tx = await program.methods
         .registerInvestor(initParams)
         .accounts({
-          owner: investorOwner.publicKey,
-          investor: investor,
+          owner: firstInvestorOwner.publicKey,
+          investor: firstInvestor,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
-        .signers([investorOwner])
+        .signers([firstInvestorOwner])
         .rpc();
       console.log("Your transaction signature", tx);
     } catch (error) {
@@ -298,7 +368,36 @@ describe("treasury_bonds", () => {
     }
 
     try {
-      let result = await program.account.investor.fetch(investor);
+      let result = await program.account.investor.fetch(firstInvestor);
+      console.log("investor: ", result);
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  it("Is register second investor!", async () => {
+    try {
+      let initParams = {
+        fullNames: "philip samuel",
+        country: "KE",
+      };
+
+      const tx = await program.methods
+        .registerInvestor(initParams)
+        .accounts({
+          owner: secondInvestorOwner.publicKey,
+          investor: secondInvestor,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([secondInvestorOwner])
+        .rpc();
+      console.log("Your transaction signature", tx);
+    } catch (error) {
+      console.log(error);
+    }
+
+    try {
+      let result = await program.account.investor.fetch(secondInvestor);
       console.log("investor: ", result);
     } catch (error) {
       console.log(error);
@@ -330,17 +429,17 @@ describe("treasury_bonds", () => {
       const tx = await program.methods
         .buyTreasuryBonds(initParams)
         .accounts({
-          owner: investorOwner.publicKey,
+          owner: firstInvestorOwner.publicKey,
           treasuryBonds: treasuryBonds,
-          investor: investor,
-          senderTokens: investorOwnerATA.publicKey,
+          investor: firstInvestor,
+          senderTokens: firstInvestorOwnerATA.publicKey,
           recipientTokens: treasuryVaultATA.address,
           mintToken: mintToken.publicKey,
           tokenProgram: TOKEN_PROGRAM_ID,
           associateTokenProgram: associateTokenProgram,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
-        .signers([investorOwner])
+        .signers([firstInvestorOwner])
         .rpc();
       console.log("Your transaction signature", tx);
     } catch (error) {
@@ -348,7 +447,7 @@ describe("treasury_bonds", () => {
     }
 
     try {
-      let result = await program.account.investor.fetch(investor);
+      let result = await program.account.investor.fetch(firstInvestor);
       console.log("investor: ", result);
 
       let result2 = await program.account.treasuryBonds.fetch(treasuryBonds);
@@ -361,26 +460,24 @@ describe("treasury_bonds", () => {
   it("Is sell treasury bonds!", async () => {
     try {
       let initParams = {
-        // 3 amount of token to transfer (in smallest unit i.e 9 decimals)
-        amount: new anchor.BN(3),
+        // 10 amount of token to transfer (in smallest unit i.e 9 decimals)
+        amount: new anchor.BN(10),
       };
       const tx = await program.methods
         .sellTreasuryBonds(initParams)
         .accounts({
-          owner: investorOwner.publicKey,
+          owner: secondInvestorOwner.publicKey,
           treasuryBonds: treasuryBonds,
-          investor: investor,
-          senderTokens: treasuryVaultATA.address,
-          recipientTokens: investorOwnerATA.publicKey,
+          sellerInvestor: firstInvestor,
+          buyerInvestor: secondInvestor,
           mintToken: mintToken.publicKey,
-          depositAccount: depositAccount.publicKey,
-          pdaAuth: pdaAuth,
-          treasuryVault: treasuryVault,
+          fromAccount: secondInvestorOwnerATA.publicKey, // buyer
+          toAccount: firstInvestorOwnerATA.publicKey, // seller
           tokenProgram: TOKEN_PROGRAM_ID,
           associateTokenProgram: associateTokenProgram,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
-        .signers([investorOwner])
+        .signers([mintToken, secondInvestorOwner])
         .rpc();
       console.log("Your transaction signature", tx);
     } catch (error) {
@@ -393,7 +490,55 @@ describe("treasury_bonds", () => {
       );
       console.log("deposit account: ", result);
 
-      let result2 = await program.account.investor.fetch(investor);
+      let result2 = await program.account.investor.fetch(firstInvestor);
+      console.log("first investor: ", result2);
+
+      let result3 = await program.account.investor.fetch(secondInvestor);
+      console.log("second investor: ", result3);
+
+      let result4 = await program.account.treasuryBonds.fetch(treasuryBonds);
+      console.log("treasury bonds: ", result4);
+    } catch (error) {
+      console.log(error);
+    }
+  });
+
+  it("Is redeem treasury bonds!", async () => {
+    try {
+      let initParams = {
+        // 10 amount of token to transfer (in smallest unit i.e 9 decimals)
+        amount: new anchor.BN(10),
+      };
+      const tx = await program.methods
+        .redeemTreasuryBonds(initParams)
+        .accounts({
+          owner: secondInvestorOwner.publicKey,
+          treasuryBonds: treasuryBonds,
+          investor: secondInvestor,
+          senderTokens: treasuryVaultATA.address,
+          recipientTokens: secondInvestorOwnerATA.publicKey,
+          mintToken: mintToken.publicKey,
+          depositAccount: depositAccount.publicKey,
+          pdaAuth: pdaAuth,
+          treasuryVault: treasuryVault,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associateTokenProgram: associateTokenProgram,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .signers([secondInvestorOwner])
+        .rpc();
+      console.log("Your transaction signature", tx);
+    } catch (error) {
+      console.log(error);
+    }
+
+    try {
+      let result = await program.account.depositBase.fetch(
+        depositAccount.publicKey
+      );
+      console.log("deposit account: ", result);
+
+      let result2 = await program.account.investor.fetch(secondInvestor);
       console.log("investor: ", result2);
 
       let result3 = await program.account.treasuryBonds.fetch(treasuryBonds);

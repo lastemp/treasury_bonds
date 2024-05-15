@@ -12,11 +12,12 @@ There are three main types of treasury bonds:
 Below are some features contained in the program:
 
 - Register treasury bonds
-- Register investor
+- Register investor(s)
 - Buy treasury bonds using USDC token
 - Sell treasury bonds and get USDC token
 - Create USDC token (*for test purposes)
 - Transfer USDC token
+- Redeem treasury bonds
 
 ## Getting started
 

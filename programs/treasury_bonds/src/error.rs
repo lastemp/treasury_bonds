@@ -19,10 +19,14 @@ pub enum TreasuryBondsError {
     InvalidValueRedemptionLength,
     #[msg("Invalid amount.")]
     InvalidAmount,
+    #[msg("Available balance should match tranfer amount.")]
+    MismatchedAmount,
     #[msg("Invalid numeric value.")]
     InvalidNumeric,
     #[msg("Invalid minimum bid amount.")]
     InvalidMinimumBidAmount,
+    #[msg("Invalid bond maturity status.")]
+    InvalidBondMaturityStatus,
 
     //
     #[msg("Invalid country length")]

@@ -53,4 +53,11 @@ pub mod treasury_bonds {
     pub fn transfer_token(ctx: Context<TransferToken>, params: TransferTokenParams) -> Result<()> {
         instructions::transfer_token(ctx, &params)
     }
+
+    pub fn redeem_treasury_bonds(
+        ctx: Context<RedeemTreasuryBonds>,
+        params: RedeemTreasuryBondsParams,
+    ) -> Result<()> {
+        instructions::redeem_treasury_bonds(ctx, &params)
+    }
 }

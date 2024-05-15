@@ -59,6 +59,7 @@ pub fn buy_treasury_bonds(
     let investor = &mut ctx.accounts.investor;
     let unit_cost_of_treasury_bonds: u32 = treasury_bonds.unit_cost_of_treasury_bonds;
     let total_amounts_accepted = treasury_bonds.total_amounts_accepted;
+    let total_available_funds = treasury_bonds.total_available_funds;
     let minimum_bid_amount = treasury_bonds.minimum_bid_amount;
     let total_units_treasury_bonds: u32 = investor.total_units_treasury_bonds;
     let available_funds: u32 = investor.available_funds;
@@ -86,6 +87,11 @@ pub fn buy_treasury_bonds(
 
     // Increment total_amounts_accepted with new _amount
     treasury_bonds.total_amounts_accepted = total_amounts_accepted
+        .checked_add(_amount)
+        .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
+
+    // Increment total_available_funds with new _amount
+    treasury_bonds.total_available_funds = total_available_funds
         .checked_add(_amount)
         .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
 

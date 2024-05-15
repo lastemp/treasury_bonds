@@ -8,7 +8,7 @@ use {
     anchor_lang::prelude::*,
     anchor_spl::{
         associated_token::AssociatedToken,
-        token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked},
+        token::{transfer, Mint, Token, TokenAccount, Transfer},
     },
 };
 
@@ -16,28 +16,24 @@ use {
 #[instruction(params: SellTreasuryBondsParams)]
 pub struct SellTreasuryBonds<'info> {
     #[account(mut,
-        constraint = treasury_bonds.is_initialized @ TreasuryBondsError::AccountNotInitialized
+        constraint = treasury_bonds.is_initialized @ TreasuryBondsError::AccountNotInitialized,
+        constraint = !treasury_bonds.is_matured @ TreasuryBondsError::InvalidBondMaturityStatus
     )]
     pub treasury_bonds: Account<'info, TreasuryBonds>,
-    #[account(mut,has_one = owner,
-        constraint = investor.active @ TreasuryBondsError::InvalidInvestorStatus
-    )]
-    pub investor: Account<'info, Investor>,
-    #[account(mut)]
-    pub sender_tokens: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub recipient_tokens: Account<'info, TokenAccount>,
-    #[account(mut)]
-    pub mint_token: Account<'info, Mint>,
     #[account(mut,
-        constraint = deposit_account.is_initialized @ TreasuryBondsError::AccountNotInitialized
+        constraint = seller_investor.active @ TreasuryBondsError::InvalidInvestorStatus
     )]
-    pub deposit_account: Account<'info, DepositBase>,
-    #[account(seeds = [b"auth", deposit_account.key().as_ref()], bump)]
-    /// CHECK: no need to check this.
-    pub pda_auth: UncheckedAccount<'info>,
-    #[account(mut, seeds = [b"treasury-vault", pda_auth.key().as_ref()], bump)]
-    pub treasury_vault: SystemAccount<'info>,
+    pub seller_investor: Account<'info, Investor>,
+    #[account(mut,has_one = owner,
+        constraint = buyer_investor.active @ TreasuryBondsError::InvalidInvestorStatus
+    )]
+    pub buyer_investor: Account<'info, Investor>,
+    #[account(mut)]
+    pub from_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub to_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    pub mint_token: Signer<'info>,
     // mut makes it changeble (mutable)
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -61,25 +57,25 @@ pub fn sell_treasury_bonds(
     }
 
     let treasury_bonds = &mut ctx.accounts.treasury_bonds;
-    let investor = &mut ctx.accounts.investor;
-    let sender_tokens = &ctx.accounts.sender_tokens;
-    let recipient_tokens = &ctx.accounts.recipient_tokens;
-    let mint_token = &ctx.accounts.mint_token;
-    let deposit_account = &ctx.accounts.deposit_account;
-    let pda_auth = &mut ctx.accounts.pda_auth;
-    let treasury_vault = &mut ctx.accounts.treasury_vault;
-    let token_program = &ctx.accounts.token_program;
+    let seller_investor = &mut ctx.accounts.seller_investor;
+    let buyer_investor = &mut ctx.accounts.buyer_investor;
     let unit_cost_of_treasury_bonds: u32 = treasury_bonds.unit_cost_of_treasury_bonds;
-    let total_amounts_accepted = treasury_bonds.total_amounts_accepted;
-    let total_units_treasury_bonds: u32 = investor.total_units_treasury_bonds;
-    let available_funds: u32 = investor.available_funds;
+    let total_units_treasury_bonds_seller: u32 = seller_investor.total_units_treasury_bonds;
+    let available_funds_seller: u32 = seller_investor.available_funds;
+    let total_units_treasury_bonds_buyer: u32 = buyer_investor.total_units_treasury_bonds;
+    let available_funds_buyer: u32 = buyer_investor.available_funds;
     let decimals: u8 = treasury_bonds.decimals;
     let _amount = params.amount;
 
-    // investor's available funds should exceed transfer amount
-    if available_funds > _amount {
-    } else {
+    // investor's(seller) available funds should exceed zero
+    if available_funds_seller == 0 {
         return Err(TreasuryBondsError::InsufficientFunds.into());
+    }
+
+    // investor's(seller) available funds should match transfer amount
+    if available_funds_seller == _amount {
+    } else {
+        return Err(TreasuryBondsError::MismatchedAmount.into());
     }
 
     // Get unit_cost_of_treasury_bonds from the product of unit_cost_of_treasury_bonds and actual_amount
@@ -87,19 +83,24 @@ pub fn sell_treasury_bonds(
         .checked_mul(_amount)
         .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
 
-    // Deduct sold unit_cost_of_treasury_bonds from investor's total_units_treasury_bonds
-    investor.total_units_treasury_bonds = total_units_treasury_bonds
+    // Deduct sold unit_cost_of_treasury_bonds from seller_investor's total_units_treasury_bonds
+    seller_investor.total_units_treasury_bonds = total_units_treasury_bonds_seller
         .checked_sub(unit_cost_of_treasury_bonds)
         .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
 
-    // Deduct actual_amount(sold unit_cost_of_treasury_bonds) from investor's available funds
-    investor.available_funds = available_funds
+    // Deduct actual_amount(sold unit_cost_of_treasury_bonds) from seller_investor's available funds
+    seller_investor.available_funds = available_funds_seller
         .checked_sub(_amount)
         .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
 
-    // Deduct actual_amount(sold unit_investment_trusts) from total_amounts_accepted
-    treasury_bonds.total_amounts_accepted = total_amounts_accepted
-        .checked_sub(_amount)
+    // Increment buyer's total_units_treasury_bonds with new unit_treasury_bonds
+    buyer_investor.total_units_treasury_bonds = total_units_treasury_bonds_buyer
+        .checked_add(unit_cost_of_treasury_bonds)
+        .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
+
+    // Increment buyer's available_funds with new _amount
+    buyer_investor.available_funds = available_funds_buyer
+        .checked_add(_amount)
         .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
 
     let base: u32 = 10;
@@ -111,25 +112,17 @@ pub fn sell_treasury_bonds(
         .checked_mul(result as u64)
         .ok_or(TreasuryBondsError::InvalidArithmeticOperation)?;
 
-    // Transfer funds from treasury vault to recipient
-    let cpi_accounts = TransferChecked {
-        from: sender_tokens.to_account_info(),
-        mint: mint_token.to_account_info(),
-        to: recipient_tokens.to_account_info(),
-        authority: treasury_vault.to_account_info(),
-    };
-
-    let seeds = &[
-        b"treasury-vault",
-        pda_auth.to_account_info().key.as_ref(),
-        &[deposit_account.admin_treasury_vault_bump.unwrap()],
-    ];
-
-    let signer = &[&seeds[..]];
-
-    let cpi = CpiContext::new_with_signer(token_program.to_account_info(), cpi_accounts, signer);
-
-    transfer_checked(cpi, _amount, decimals)?;
+    transfer(
+        CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                authority: ctx.accounts.owner.to_account_info(),
+                from: ctx.accounts.from_account.to_account_info(),
+                to: ctx.accounts.to_account.to_account_info(),
+            },
+        ),
+        _amount,
+    )?;
 
     Ok(())
 }
